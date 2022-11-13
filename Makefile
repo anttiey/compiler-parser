@@ -1,9 +1,8 @@
-
 all: hw2.exe 
 
-hw2.exe : hw2.c hw2.l header.h
-	flex -o hw2.yy.c hw2.l
-	gcc -o $@ hw2.c hw2.yy.c -lfl 
+hw2.exe : parser.c lexer.l header.h
+	flex -o parser.yy.c parser.l
+	gcc -o $@ parser.c parser.yy.c -lfl 
 
 .PHONY : clean
 clean :
