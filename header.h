@@ -1,16 +1,17 @@
+#define MAX_NUM 100
 #define MAX_LINE 256
-#define MAX_NUM 1024
+#define MAX_CONTAINER 1024
 
-#define OPERATOR 1
-#define ASSIGN 2
-#define PLUS 3
-#define MINUS 4
-#define MULTI 5
-#define DIVISION 6
-#define LP 8
-#define RP 9
+#define OPERATOR 10
+#define ASSIGN 11
+#define PLUS 12
+#define MINUS 13
+#define MULTI 14
+#define DIVISION 15
+#define LP 16
+#define RP 17
 
-#define INTEGER     20
-#define REAL        21
-#define STRING      22
-#define VARIABLE    23
+#define INTEGER     1
+#define REAL        2
+#define STRING      3
+#define VARIABLE    4
