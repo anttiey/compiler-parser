@@ -1,6 +1,9 @@
+#ifndef _HEADER_H_
+#define _HEADER_H_ 1
+
 #define MAX_NUM 100
 #define MAX_LINE 256
-#define MAX_CONTAINER 1024
+#define MAX_CONTAINER 100
 
 #define OPERATOR 10
 #define ASSIGN 11
@@ -11,7 +14,9 @@
 #define LP 16
 #define RP 17
 
-#define INTEGER     1
-#define REAL        2
-#define STRING      3
-#define VARIABLE    4
+#define INTEGER     2
+#define REAL        3
+#define STRING      4
+#define VARIABLE    5
+
+#endif

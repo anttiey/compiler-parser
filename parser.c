@@ -27,11 +27,11 @@ typedef struct Node {
     struct Node *right;
 
     int type;
-    char* operator;
+    char operator[MAX_NUM];
 
     int value_int;
     double value_double;
-    char* value_string;
+    char value_string[MAX_NUM];
 } Node;
 
 typedef struct ContainerDepth {
@@ -44,40 +44,34 @@ typedef struct ContainerList {
     int depth;
 } ContainerList;
 
-Node* create_node();
-
-void A();
-void E();
-void T();
-void F();
-void S();
-void Aprime(); /* This is for A' */
-void Eprime(); /* This is for E' */
-void Tprime(); /* This is for T' */
-Node* Fprime(); /* This is for F' */
-
-char line[MAX_LINE];
-char *str;
-
+Node* tokens[MAX_LINE];
 int tok;
 
-int main(int argc, char *argv[]) {
+Node* A(Node* n);
+Node* E(Node* n);
+Node* T(Node* n);
+Node* F(Node* n);
+Node* S(Node* n);
+Node* Aprime(Node* n); /* This is for A' */
+Node* Eprime(Node* n); /* This is for E' */
+Node* Tprime(Node* n); /* This is for T' */
+Node* Fprime(Node* n); /* This is for F' */
 
-    while(1) {
-        printf(">");
-        tok = yylex();
-        A();
-        print_node;
-        printf("\n");
-    }
+void init_node(Node *node) {
+    node->left = 0;
+    node->right = 0;
+
+    node->type = 0;
+    node->value_int = 0;
+    node->value_double = 0l;
+    node->value_string[0] = 0;
+    node->operator[0] = 0;
 }
 
 Node* create_node() {
-    Node* n;
-    n = (Node*)malloc(sizeof(Node));
+    Node* n = (Node*)malloc(sizeof(Node));
 
-    n->left = 0;
-    n->right = 0;
+    init_node(n);
 
     return n;
 }
@@ -93,9 +87,9 @@ Node* insert_value(Node* n, int type, char* value) {
             n->value_double = atof(value);
             break;
         case STRING:
-            n->value_string = value;
+            strcpy(n->value_string, value);
         default:
-            n->operator = value;
+            strcpy(n->operator, value);
     }
 
     return n;
@@ -137,12 +131,6 @@ void get_operator(Node* n, char* buffer) {
             break;
         case DIVISION:
             strcpy(buffer, "/");
-            break;
-        case LP:
-            strcpy(buffer, "(");
-            break;
-        case RP:
-            strcpy(buffer, ")");
             break;
         default:
             break;
@@ -228,7 +216,7 @@ void update_container_from_node(ContainerList* c, Node* n, int depth) {
 
 void print_container(ContainerList* c) {
     for(int i = 0; i < c->depth; i++) {
-        printf("%d >> ", i);
+        printf("> ");
 
         for(int j = 0; j < c->container[i].index; j++) {
             Node* n = c->container[i].nodes[j];
@@ -240,121 +228,263 @@ void print_container(ContainerList* c) {
     }
 }
 
-void print_tree(Node* n) {
+void print_act(Node* n) {
     ContainerList c;
     init_container(&c);
     update_container_from_node(&c, n, 0);
     print_container(&c);
 }
 
-void A() {
-    if (tok == VARIABLE) {
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
-        Aprime();
+Node print_value(Node* root, int depth) {
+
+    Node result;
+
+    init_node(&result);
+    result.type = INTEGER;
+
+    if (root == NULL) {
+        return result;
+    }
+
+    if (root->type > 10) {
+        Node l = print_value(root->left, depth + 1);
+        Node r = print_value(root->right, depth + 1);
+
+        switch (root->type)
+        {
+            case ASSIGN:
+                break;
+            case PLUS:
+                {
+                    if (root->left != NULL && root->right != NULL) {
+                        result.value_int = l.value_int + r.value_int;
+                    } else if (root->left) {
+                        result.value_int = l.value_int;
+                    } else if (root->right) {
+                        result.value_int = r.value_int;
+                    } else {
+                        //
+                    }
+                }
+                break;
+            case MINUS:
+                {
+                    if (root->left != NULL && root->right != NULL) {
+                        result.value_int = l.value_int - r.value_int;
+                    } else if (root->left) {
+                        result.value_int = - l.value_int;
+                    } else if (root->right) {
+                        result.value_int = - r.value_int;
+                    } else {
+                        //
+                    }
+                }
+                break;
+            case MULTI:
+                {
+                    if (root->left != NULL && root->right != NULL) {
+                        result.value_int = l.value_int * r.value_int;
+                    } else if (root->left) {
+                        result.value_int = l.value_int;
+                    } else if (root->right) {
+                        result.value_int = r.value_int;
+                    } else {
+                        //
+                    }
+                }
+                break;
+            case DIVISION:
+                {
+                    if (root->left != NULL && root->right != NULL) {
+                        result.value_int = l.value_int / r.value_int;
+                    } else if (root->left) {
+                        result.value_int = l.value_int;
+                    } else if (root->right) {
+                        result.value_int = r.value_int;
+                    } else {
+                        //
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    else {
+        result = *root;
+    }
+
+    if (depth > 0) {
+        return result;
     } else {
-        Fprime();
+        print_node(&result);
+    }
+
+}
+
+
+Node* A(Node *n) {
+    if (tok == VARIABLE) {
+        Node* node = create_node();
+        insert_value(node, tok, yytext);
+        return Aprime(node);
+    } else {
+        Node* m = Fprime(n);
         tok = yylex();
-        Tprime();
-        Eprime();
+        Node* l = Tprime(m);
+        return Eprime(l);
     }
 }
 
-void Aprime() {
+Node* Aprime(Node* n) {
     if (tok == ASSIGN) {
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
-        A();
+        Node* node = create_node();
+        insert_value(node, tok, yytext);
+
+        tok = yylex();
+
+        Node* m = A(node);
+        node->right = m;
+
+        return m;
     } else {
-        Tprime();
-        Eprime();
+        Node* node = Tprime(n);
+        return Eprime(node);
     }
 }
 
-void E() {
-    T();
+Node* E(Node *n) {
+    Node* m = T(n);
     tok = yylex();
-    Eprime();
+    return Eprime(m);
 }
 
-void Eprime() {
+Node* Eprime(Node *n) {
     if (tok == PLUS) { /* E' -> +TE' */
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
+        Node* node = create_node();
+        insert_value(node, tok, yytext);
+
+        node->left = n;
+
         tok = yylex();
-        T();
-        Eprime();
+        Node* m = T(node);
+
+        node->right = m;
+
+        return Eprime(node);
     } else if (tok == MINUS) { /* E' -> -TE' */
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
+        Node* node = create_node();
+        insert_value(node, tok, yytext);
+
+        node->left = n;
+
         tok = yylex();
-        T();
-        Eprime();
+        Node* m = T(node);
+
+        node->right = m;
+
+        return Eprime(node);
     } else { /* E' -> ε */
-
+        return n;
     }
 }
 
-void T() {
-    F();
+Node* T(Node *n) {
+    Node* m = F(n);
     tok = yylex();
-    Tprime();
+    return Tprime(m);
 }
 
-void Tprime() {
+Node* Tprime(Node* n) {
     if (tok == MULTI) { /* T' -> *FT' */
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
-        tok = yylex();
-        F();
-        Tprime();
-    } else if (tok == DIVISION) { /* T' -> /FT' */
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
-        tok = yylex();
-        F();
-        Tprime();
-    } else { /* T' -> ε */
+        Node* node = create_node();
+        insert_value(node, tok, yytext);
 
+        node->left = n;
+
+        tok = yylex();
+        Node* m = F(node);
+
+        node->right = m;
+
+        return Tprime(node);
+    } else if (tok == DIVISION) { /* T' -> /FT' */
+        Node* node = create_node();
+        insert_value(node, tok, yytext);
+
+        node->left = n;
+
+        tok = yylex();
+        Node* m = F(node);
+
+        node->right = m;
+
+        return Tprime(node);
+    } else { /* T' -> ε */
+        return n;
     }
 }
 
-void F() {
+Node* F(Node *n) {
     if (tok == VARIABLE) {
         Node* n = create_node();
         insert_value(n, tok, yytext);
     } else {
-        Fprime();
+        return Fprime(n);
     }
 }
 
-Node* Fprime() {
+Node* Fprime(Node *n) {
     if (tok == INTEGER) {
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
+        Node* node = create_node();
+        insert_value(node, tok, yytext);
+        printf("print: %d ", node->value_int);
+        return node;
     } else if (tok == REAL) {
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
+        Node* node = create_node();
+        insert_value(node , tok, yytext);
+        printf("print: %f ", atof(yytext));
+        return node;
     } else if (tok == STRING) {
-        S();
+        return S(n);
     } else if (tok == MINUS) {
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
+        Node* node = create_node();
+        insert_value(node, tok, yytext);
+
         tok = yylex();
-        F();
+
+        Node* m = F(node);
+        node->left = m;
+
+        return m;
     } else if (tok == LP) {
-        Node* n = create_node();
-        insert_value(n, tok, yytext);
+        Node* node = create_node();
+        insert_value(node, tok, yytext);
         tok = yylex();
-        A();
+        A(node);
         if(tok == RP) {
-            Node* n = create_node();
-            insert_value(n, tok, yytext);
+            Node* node = create_node();
+            insert_value(node, tok, yytext);
         }
     }
 }
 
-void S() {
-    Node* n = create_node();
-    insert_value(n, tok, yytext);
+Node* S(Node *n) {
+    Node* node = create_node();
+    insert_value(node, tok, yytext);
+    printf("print: %s ", yytext);
+    return node;
+}
+
+int main(int argc, char *argv[]) {
+
+    while(1) {
+        printf(">");
+        tok = yylex();
+        Node* root = A(NULL);
+        printf("\n");
+        print_value(root, 0);
+        printf("\n");
+        print_act(root);
+    }
 }
