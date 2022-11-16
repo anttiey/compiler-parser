@@ -3,8 +3,8 @@
 %}
 
 blank       [ \t]+
-integer     [-+]?[1-9][0-9]*
-real        [-+]?((0|[1-9][0-9]*)\.[0-9]+)
+integer     [1-9][0-9]*
+real        ((0|[1-9][0-9]*)?\.[0-9]+)
 string      \"([^"\\\n]|\\(.|\n))*\"
 variable    [a-zA-Z][a-zA-Z0-9]*
 
@@ -22,4 +22,6 @@ variable    [a-zA-Z][a-zA-Z0-9]*
 {string}    { return STRING; }
 {blank}     ;
 "\n"        { return 0; }
+"$ast"      { return AST; }
+"$symbol"   { return SYMBOL; }
 %%

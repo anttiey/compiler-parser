@@ -19,4 +19,7 @@
 #define STRING      4
 #define VARIABLE    5
 
+#define AST         20
+#define SYMBOL      21
+
 #endif
