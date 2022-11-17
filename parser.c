@@ -18,7 +18,7 @@ extern void yyrestart(FILE* input);
     T  -> F T'
     T' -> * F T' | / F T' | ε
     F  -> id | F'
-    F' -> ( A ) | inum | fnum | S | - F | sub(S, E, E)
+    F' -> ( A ) | inum | fnum | S | - F | sub( S, E, E )
     S  -> str
 */
 
@@ -46,15 +46,14 @@ typedef struct ContainerList {
 
 typedef struct Table {
     int index;
-    Node* nodes[MAX_NUM];
     char names[MAX_NUM][MAX_NUM];
-    char values[MAX_NUM][MAX_NUM];
+    Node nodes[MAX_NUM];
 } Table;
+
+Table symbol_table;
 
 Node* tokens[MAX_NUM];
 int tok;
-
-struct Table symbol_table;
 
 Node* A(Node* n);
 Node* E(Node* n);
@@ -65,6 +64,20 @@ Node* Aprime(Node* n); /* This is for A' */
 Node* Eprime(Node* n); /* This is for E' */
 Node* Tprime(Node* n); /* This is for T' */
 Node* Fprime(Node* n); /* This is for F' */
+
+void error_handling(int error, char* message) {
+    switch(error) {
+        case 1:
+            printf("RUNTIME ERROR: %s", message);
+            break;
+        case 2:
+            printf("SYNTAX ERROR: %s", message);
+            break;
+        case 3:
+            printf("LEXICAL ERROR: %s", message);
+            break;
+    }  
+}
 
 void init_node(Node *node) {
     node->left = 0;
@@ -97,8 +110,13 @@ Node* insert_value(Node* n, int type, char* value) {
             break;
         case STRING:
             strcpy(n->value_string, value);
+            break;
+        case VARIABLE:
+            strcpy(n->value_string, value);
+            break;
         default:
             strcpy(n->operator, value);
+            break;
     }
 
     return n;
@@ -114,6 +132,9 @@ void get_constant(Node *n, char* buffer) {
             sprintf(buffer, "%f", n->value_double);
             break;
         case STRING:
+            sprintf(buffer, "%s", n->value_string);
+            break;
+        case VARIABLE:
             sprintf(buffer, "%s", n->value_string);
             break;
         default:
@@ -178,6 +199,7 @@ void print_node(Node* n) {
     buffer[0] = 0;
 
     get_value(n, buffer);
+
     if(n->type == STRING) {
         printf("\"%s\"", buffer);
     } else {
@@ -244,7 +266,7 @@ void print_container(ContainerList* c) {
     }
 }
 
-void print_act(Node* n) {
+void print_ast(Node* n) {
     ContainerList c;
     init_container(&c);
     update_container_from_node(&c, n, 0);
@@ -254,9 +276,8 @@ void print_act(Node* n) {
 void table_init(struct Table *table) {
 
     for(int i = 0; i < MAX_NUM; i++) {
-        table->values[i][0] = 0;
         table->names[i][0] = 0;
-        table->nodes[i] = 0;
+        init_node(&(table->nodes[i]));
     }
 
      table->index = 0;
@@ -271,61 +292,38 @@ void table_add(struct Table *table, Node *id, Node *value) {
     get_value(id, name_string);
 
     for(int i = 0; i < table->index; i++) {
-        if (strcmp(table->names[table->index], name_string) == 0) {
-            table->nodes[table->index] = value;
+        if (!strcmp(table->names[i], name_string)) {
+            table->nodes[i] = *(value);
             return;
         }
     }
 
-    table->index++;
     strcpy(table->names[table->index], name_string);
-    table->nodes[table->index] = value;
+    table->nodes[table->index] = *(value);
+
+    table->index++;
 
 }
 
+Node* table_get(struct Table *table, Node *id) {
 
-void table_print(struct Table *table) {
+    char name_string[MAX_NUM];
+    name_string[0] = 0;
+
+    get_value(id, name_string);
 
     for(int i = 0; i < table->index; i++) {
-
-        char buffer[MAX_NUM];
-        buffer[0] = 0;
-        get_value(table->nodes[table->index], buffer);
-
-        switch(table->nodes[table->index]->type) {
-            case INTEGER:
-                printf("%s\t INT\t %s\n", table->names[table->index], buffer);
-                break;
-            case REAL:
-                printf("%s\t REAL\t %s\n", table->names[table->index], buffer);
-                break;
-            case STRING:
-                printf("%s\t STRING\t %s\n", table->names[table->index], buffer);
-                break;
-            default:
-                break;
+        if (!strcmp(table->names[i], name_string)) {
+            return &table->nodes[i];
         }
-
     }
 
+    error_handling(1, "UNDEFINED VARIABLE");
+
+    return NULL;
+
 }
 
-void error_handling(int error, char* message) {
-    switch(error) {
-        case 0:
-            printf("UNDEFINED VARIABLE: %s", message);
-            break;
-        case 1:
-            printf("RUNTIME ERROR: %s", message);
-            break;
-        case 2:
-            printf("SYNTAX ERROR: %s", message);
-            break;
-        case 3:
-            printf("LEXICAL ERROR: %s", message);
-            break;
-    }  
-}
 
 Node plus_calculator(Node *left, Node *right) {
     Node result;
@@ -336,7 +334,26 @@ Node plus_calculator(Node *left, Node *right) {
     right_string[0] = 0;
 
     if(left->type > 0 && right->type > 0) {
-        if (left->type == STRING || right->type == STRING) {
+
+        if (left->type == VARIABLE) {
+
+            left = table_get(&symbol_table, left);
+            if (left == NULL) { return result; }
+
+            if (right->type == VARIABLE) {
+                right = table_get(&symbol_table, right);
+                if (right == NULL) { return result; }
+            } 
+
+            return plus_calculator(left, right);
+
+        } else if (right->type == VARIABLE) {
+
+            right = table_get(&symbol_table, right);
+            if (right == NULL) { return result; }
+            return plus_calculator(left, right);
+
+        } else if (left->type == STRING || right->type == STRING) {
             result.type = STRING;
 
             get_value(left, left_string);
@@ -394,17 +411,39 @@ Node minus_calculator(Node *left, Node *right) {
     right_string[0] = 0;
 
     if(left->type > 0 && right->type > 0) {
-        if (left->type == STRING || right->type == STRING) {
-            
+        if (left->type == VARIABLE) {
+
+            left = table_get(&symbol_table, left);
+            if (left == NULL) { return result; }
+
+            if (right->type == VARIABLE) {
+                right = table_get(&symbol_table, right);
+                if (right == NULL) { return result; }
+            } 
+
+            return minus_calculator(left, right);
+
+        } else if (right->type == VARIABLE) {
+
+            right = table_get(&symbol_table, right);
+            if (right == NULL) { return result; }
+
+            return minus_calculator(left, right);
+
+        } else if (left->type == STRING || right->type == STRING) {
+
+            error_handling(1, "STRING은 MINUS 할 수 없다.");
+            return result;
+
         } else if (left->type == REAL) {
             result.type = REAL;
 
             if (right->type == INTEGER) {
                 result.value_double = left->value_double - (double)(right->value_int);
             } else if (right->type == REAL) {
-                result.value_double = left->value_double + right->value_double;
+                result.value_double = left->value_double - right->value_double;
             } else {
-                result.value_double = -left->value_double;
+                result.value_double = - left->value_double;
             }
         } else if (right->type == REAL) {
             result.type = REAL;
@@ -412,7 +451,7 @@ Node minus_calculator(Node *left, Node *right) {
             if (left->type == INTEGER) {
                 result.value_double = (double)(left->value_int) - right->value_double;
             } else {
-                result.value_double = -right->value_double;
+                result.value_double = - right->value_double;
             }
         } else if (left->type == INTEGER) {
             result.type = INTEGER;
@@ -420,14 +459,13 @@ Node minus_calculator(Node *left, Node *right) {
             if (right->type == INTEGER) {
                 result.value_int = left->value_int - right->value_int;
             } else {
-                result.value_int = -left->value_int;
+                result.value_int = - left->value_int;
             }
 
         } else if (right->type == INTEGER) {
 
             result.type = INTEGER;
-
-            result.value_int = -right->value_int;
+            result.value_int = - right->value_int;
 
         }
 
@@ -438,15 +476,23 @@ Node minus_calculator(Node *left, Node *right) {
             result.value_int = - result.value_int;
         } else if (result.type == REAL) {
             result.value_double = - result.value_double;
+        } else if (result.type == VARIABLE) {
+            left = table_get(&symbol_table, left);
+            if (left == NULL) { return result; }
+            return minus_calculator(left, right);
         }
 
     } else if (right->type > 0) {
         result = *(right);
 
         if (result.type == INTEGER) {
-            result.value_int = -result.value_int;
+            result.value_int = - result.value_int;
         } else if (result.type == REAL) {
-            result.value_int = -result.value_int;
+            result.value_int = - result.value_int;
+        } else if (result.type == VARIABLE) {
+            right = table_get(&symbol_table, right);
+            if (right == NULL) { return result; }
+            return minus_calculator(left, right);
         }
     }
     
@@ -462,7 +508,25 @@ Node multi_calculator(Node *left, Node *right) {
     right_string[0] = 0;
 
     if(left->type > 0 && right->type > 0) {
-        if (left->type == STRING) {
+        if (left->type == VARIABLE) {
+
+            left = table_get(&symbol_table, left);
+            if (left == NULL) { return result; }
+
+            if (right->type == VARIABLE) {
+                right = table_get(&symbol_table, right);
+                if (right == NULL) { return result; }
+            } 
+
+            return multi_calculator(left, right);
+
+        } else if (right->type == VARIABLE) {
+
+            right = table_get(&symbol_table, right);
+            if (right == NULL) { return result; }
+            return multi_calculator(left, right);
+
+        } else if (left->type == STRING) {
 
             if (right->type == INTEGER) {
                 if (right->value_int < 0) {
@@ -512,6 +576,8 @@ Node multi_calculator(Node *left, Node *right) {
 
             if (left->type == INTEGER) {
                 result.value_double = (double)(left->value_int) * right->value_double;
+            } else if (left->type == REAL) {
+                result.value_double = left->value_double * right->value_double;
             } else {
                 result.value_double = right->value_double;
             }
@@ -541,62 +607,106 @@ Node division_calculator(Node *left, Node *right) {
     Node result;
     init_node(&result);
 
-    char left_string[MAX_NUM], right_string[MAX_NUM], temp[MAX_NUM];
+    char left_string[MAX_NUM], right_string[MAX_NUM];
     left_string[0] = 0;
     right_string[0] = 0;
-    temp[0] = 0;
 
     if(left->type > 0 && right->type > 0) {
-        if (left->type == STRING) {
+        if (left->type == VARIABLE) {
+
+            left = table_get(&symbol_table, left);
+
+            if (left == NULL) { return result; }
+
+            if (right->type == VARIABLE) {
+                right = table_get(&symbol_table, right);
+                if (right == NULL) { return result; }
+            } 
+
+            return division_calculator(left, right);
+
+        } else if (right->type == VARIABLE) {
+
+            right = table_get(&symbol_table, right);
+            if (right == NULL) { return result; }
+            return division_calculator(left, right);
+
+        } else if (left->type == STRING) {
 
             if (right->type == STRING) {
                 if (!strcmp(right->value_string, "")) {
-                    printf("Runtime Error\n");
+                    error_handling(1, "EMPTY STRING으로 나누는 것은 불가능함");
                 } else {
-                //    result.type = INTEGER;
+                    result.type = INTEGER;
 
-                //     get_value(left, left_string);
-                //     get_value(right, right_string);
+                    get_value(left, left_string);
+                    get_value(right, right_string);
 
-                //     for (int i = 0; i < (strlen(left_string) - strlen(right_string)); i++) {
-                //         int isExist = 0;
-                //         if (!strcmp(left_string[i], right_string[0])) {
-                //             for (int j = 0; strlen(right_string); j++) {
-                //                 if(!strcmp(left_string[i + j], right_string[j])) {
-                //                     isExist++;
-                //                 }
-                //             }
-                //         }
-                //     } 
+                    char* temp = (char*)malloc(sizeof(char) * (strlen(right_string) + 1));
+                    char* ptr;
+
+                    while(1) {
+                            
+                        strncpy(temp, left_string, strlen(right_string));
+                        strcpy(left_string, left_string + strlen(right_string));
+                        
+                        temp[strlen(right_string) + 1] = '\0';
+
+                        ptr = strstr(temp, right_string);
+
+                        if (ptr == NULL) {
+                            break;
+                        }
+
+                        result.value_int += 1;
+                            
+                    }
                 }
                 
             } else {
-                printf("Syntax Error\n");
+                error_handling(1, "STRING은 STRING으로만 나눌 수 있음");
             }
 
         } else if (left->type == REAL) {
-            result.type = REAL;
 
             if (right->type == INTEGER) {
-                result.value_double = left->value_double / (double)(right->value_int);
+                if (right->value_int <= 0) {
+                    error_handling(1, "0보다 작은 수로 DIVISION 할 수 없다.");
+                } else {
+                    result.type = REAL;
+                    result.value_double = left->value_double / (double)(right->value_int);
+                }
+                
             } else if (right->type == REAL) {
-                result.value_double = left->value_double / right->value_double;
+                if (right->value_double <= 0) {
+                    error_handling(1, "0보다 작은 수로 DIVISION 할 수 없다.");
+                }else {
+                    result.type = REAL;
+                    result.value_double = left->value_double / right->value_double;
+                }
             } else {
                 result.value_double = left->value_double;
             }
         } else if (right->type == REAL) {
-            result.type = REAL;
 
-            if (left->type == INTEGER) {
+            if (right->value_double <= 0) {
+                error_handling(1, "0보다 작은 수로 DIVISION 할 수 없다.");
+            }else if (left->type == INTEGER) {
+                result.type = REAL;
                 result.value_double = (double)(left->value_int) / right->value_double;
             } else {
+                result.type = REAL;
                 result.value_double = right->value_double;
             }
         } else if (left->type == INTEGER) {
-            result.type = INTEGER;
 
             if (right->type == INTEGER) {
-                result.value_int = left->value_int / right->value_int;
+                if (right->value_int <= 0) {
+                    error_handling(1, "0보다 작은 수로 DIVISION 할 수 없다.");
+                } else {
+                    result.type = INTEGER;
+                    result.value_int = left->value_int / right->value_int;
+                }
             } else {
                 result.value_int = left->value_int;
             }
@@ -633,17 +743,27 @@ Node print_value(Node* root, int depth) {
         {
             case ASSIGN:
             {
-                if (root->left->type > 0 && root->right->type > 0) {
-                    
+
+                if (l.type > 0 && r.type > 0) {
+
+                    if (l.type == VARIABLE) {
+
+                        if (r.type == INTEGER) {
+                            result.type = INTEGER;
+                            result.value_int = r.value_int;
+                        } else if (r.type == REAL) {
+                            result.type = REAL;
+                            result.value_double = r.value_double;
+                        } else if (r.type == STRING) {
+                            result.type = STRING;
+                            strcpy(result.value_string, r.value_string);
+                        }
+
+                        table_add(&symbol_table, &l, &r);
+
+                    }
                 }
-                if (root->left->type == VARIABLE) {
-
-                    table_add(&symbol_table, &l, &r);
-
-                    if (root->)
-                }
-
-
+                
             }
                 break;
             case PLUS:
@@ -676,8 +796,12 @@ Node print_value(Node* root, int depth) {
 
 Node* A(Node *n) {
     if (tok == VARIABLE) {
+
         Node* node = create_node();
         insert_value(node, tok, yytext);
+
+        tok = yylex();
+
         return Aprime(node);
     } else {
         Node* m = Fprime(n);
@@ -692,12 +816,14 @@ Node* Aprime(Node* n) {
         Node* node = create_node();
         insert_value(node, tok, yytext);
 
+        node->left = n;
+
         tok = yylex();
 
         Node* m = A(node);
         node->right = m;
 
-        return m;
+        return node;
     } else {
         Node* node = Tprime(n);
         return Eprime(node);
@@ -757,6 +883,7 @@ Node* Tprime(Node* n) {
         Node* m = F(node);
 
         node->right = m;
+        tok = yylex();
 
         return Tprime(node);
     } else if (tok == DIVISION) { /* T' -> /FT' */
@@ -780,6 +907,8 @@ Node* F(Node *n) {
     if (tok == VARIABLE) {
         Node* node = create_node();
         insert_value(node, tok, yytext);
+
+        return node;
     } else {
         return Fprime(n);
     }
@@ -793,7 +922,6 @@ Node* Fprime(Node *n) {
     } else if (tok == REAL) {
         Node* node = create_node();
         insert_value(node , tok, yytext);
-        printf("print: %f ", atof(yytext));
         return node;
     } else if (tok == STRING) {
         return S(n);
@@ -844,19 +972,43 @@ int main(int argc, char *argv[]) {
 
         if (tok == AST) {
             if (root != NULL) {
-              print_act(root);  
-            } else {
-
+              print_ast(root);  
             }
+
         } else if (tok == SYMBOL) {
             printf("\n===========================\n");
             printf("\tSYMBOL TABLE\n");
             printf("===========================\n");
             printf("NAME\t TYPE\t VALUE\n");
-            table_print(&symbol_table);
+
+            for(int i = 0; i < symbol_table.index; i++) {
+
+                char buffer[MAX_NUM];
+                buffer[0] = 0;
+
+                get_value(&(symbol_table.nodes[i]), buffer);
+
+
+                switch(symbol_table.nodes[i].type) {
+                    case INTEGER:
+                        printf("%s\t INT\t %s\n", symbol_table.names[i], buffer);
+                        break;
+                    case REAL:
+                        printf("%s\t REAL\t %s\n", symbol_table.names[i], buffer);
+                        break;
+                    case STRING:
+                        printf("%s\t STRING\t %s\n", symbol_table.names[i], buffer);
+                        break;
+                    default:
+                        break;
+                }
+
+            }
+            
         } else {
             root = A(NULL);
             print_value(root, 0);
+
         }
 
         printf("\n");

@@ -22,4 +22,6 @@
 #define AST         20
 #define SYMBOL      21
 
+#define ERROR       0
+
 #endif

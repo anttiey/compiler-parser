@@ -3,7 +3,7 @@
 %}
 
 blank       [ \t]+
-integer     [1-9][0-9]*
+integer     (0|[1-9][0-9]*)
 real        ((0|[1-9][0-9]*)?\.[0-9]+)
 string      \"([^"\\\n]|\\(.|\n))*\"
 variable    [a-zA-Z][a-zA-Z0-9]*
