@@ -1,4 +1,4 @@
-all:	parser_202020813.out
+all:	parser.out
 
 parser_202020813.out:	parser.c lexer.l header.h
 	flex -o lexer.yy.c lexer.l
